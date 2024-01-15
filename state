@@ -1,0 +1,184 @@
+from datetime import datetime, timedelta
+from typing import List, Dict
+
+import reflex as rx
+
+import sqlite3
+
+#-------------------------------------------------------------------------------------------------
+
+class State(rx.State):
+   
+    show: bool = False
+
+ 
+    days_of_week: List[str] = [
+
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday"]
+
+   
+    selected_day: str = "Monday"
+
+   
+    lists_tasks: List[str] = [""]
+
+   
+   
+#-------------------------------------------------------------------------------------------------
+     
+    def day_selector (self, new_selected_day):
+        """
+        Determines the start and end time of each day
+        Also displays database task items for each day as a string
+        
+        """
+        self.selected_day = new_selected_day
+       
+    # Get today's date at midnight
+        today_midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        
+       
+        # Calculate the start of the week (Monday) from midnight
+        start_of_week = today_midnight - timedelta(days=today_midnight.weekday())
+       
+        # Create a dictionary to hold the start and end datetime of each day
+        week_dates = {}
+
+        for i in range(7):
+            # Calculate the start and end datetime for each day
+            day = start_of_week + timedelta(days=i)
+            start_of_day = datetime(day.year, day.month, day.day, 0, 0, 0)
+            end_of_day = datetime(day.year, day.month, day.day, 23, 59, 59)
+           
+            # Map day name to its start and end datetime
+            week_dates[day.strftime("%A")] = (start_of_day, end_of_day)
+
+        (start_datetime, end_datetime) = week_dates[new_selected_day]
+        db_conn = sqlite3.connect('to_do_db1.sqlite')
+        db_cursor = db_conn.cursor()
+        db_cursor.execute(f"""SELECT * FROM tasks_table WHERE end_time >= '{start_datetime}' AND start_time <= '{end_datetime}' """)
+        day_tasks = db_cursor.fetchall()
+        print(day_tasks)
+        db_conn.close()
+        self.lists_tasks.clear()
+        for row in day_tasks:
+            task_name = row[1]
+            start_time = datetime.strptime(row[2], "%Y-%m-%d %H:%M:00").strftime("%H:%M")
+            end_time = datetime.strptime(row[3], "%Y-%m-%d %H:%M:00").strftime("%H:%M %#d %B")
+            display_string = f"{task_name}: {start_time} - {end_time}"
+            self.lists_tasks.append(display_string)
+    
+#-------------------------------------------------------------------------------------------------
+
+    # def handle_task_completion_toggle(self, row_id is_checked):
+    #     print("it's done!")
+    #     print(repr(is_checked))
+            
+#-------------------------------------------------------------------------------------------------
+
+    def handle_task_completion_toggle(self, is_checked):
+        """
+        Determines whether checkbox for task item is checked or unchecked
+        
+        """
+        print("it's done!")
+        print(repr(is_checked))
+
+#-------------------------------------------------------------------------------------------------  
+   
+    """
+    Create new task information
+    
+    """
+    new_task_name_text: str
+
+    new_task_start_time: str
+
+    new_task_end_time: str 
+
+#-------------------------------------------------------------------------------------------------
+    
+    def add_task_to_db(self):
+        """
+        Adds task to database from user input and confirms task created with window alert
+
+        """
+        db_conn = sqlite3.connect('to_do_db1.sqlite')
+        db_cursor = db_conn.cursor()
+        new_task_start_time_format = datetime.strptime(self.new_task_start_time, "%Y-%m-%dT%H:%M").strftime("%Y-%m-%d %H:%M:00")
+        new_task_end_time_format = datetime.strptime(self.new_task_end_time, "%Y-%m-%dT%H:%M").strftime("%Y-%m-%d %H:%M:00")
+        new_task_start_time_datetime_conversion = datetime.strptime(new_task_start_time_format, "%Y-%m-%d %H:%M:00")
+        new_task_end_time_datetime_conversion = datetime.strptime(new_task_end_time_format, "%Y-%m-%d %H:%M:00")
+        db_cursor.execute("""INSERT INTO tasks_table (task_name, start_time, end_time) VALUES (?, ?, ?)""",
+                          (self.new_task_name_text, new_task_start_time_datetime_conversion, new_task_end_time_datetime_conversion))
+        db_conn.commit()
+        db_conn.close()
+        self.count_rows()
+        print("task done")
+        return rx.window_alert("task created")
+
+
+#-------------------------------------------------------------------------------------------------
+
+    def count_rows(self):
+        """
+        Counts number of rows that currently exist in the database
+
+        """
+        db_conn = sqlite3.connect('to_do_db1.sqlite')
+        db_cursor = db_conn.cursor()
+        db_cursor.execute("""SELECT COUNT(*) FROM tasks_table""")
+        row = db_cursor.fetchone()
+        count = row[0]
+        db_conn.commit()
+        db_conn.close()
+        print(str(count))
+
+#-------------------------------------------------------------------------------------------------
+        
+
+    def task_not_deleted_upon_request(self):
+        """
+        Closes window alert if user declines to delete task item permanently
+
+        """
+        self.show = not (self.show)
+#-------------------------------------------------------------------------------------------------
+
+    def task_deleted_upon_request(self):
+        """
+        Confirms task item deleted if user opts to delete task item permanently
+
+        """
+        self.show = not (self.show)
+        return(rx.window_alert("Task Deleted"))
+        # SQL to delete task item from DB
+       
+#-------------------------------------------------------------------------------------------------
+    
+    def show_all_tasks(self):
+        """
+        Displays all task items in the database
+        
+        """
+        db_conn = sqlite3.connect('to_do_db1.sqlite')
+        db_cursor = db_conn.cursor()
+        db_cursor.execute("""SELECT * FROM tasks_table ORDER BY start_time""")
+        show_all_tasks = db_cursor.fetchall()
+        db_conn.close()
+        for row in show_all_tasks:
+            task_name = row[1]
+            start_time = datetime.strptime(row[2], "%Y-%m-%d %H:%M:00").strftime("%H:%M")
+            end_time = datetime.strptime(row[3], "%Y-%m-%d %H:%M:00").strftime("%H:%M %#d %B")
+            display_string = f"{task_name}: {start_time} - {end_time}"
+            self.lists_tasks.append(display_string)
+            print(display_string)
+            
+
+
