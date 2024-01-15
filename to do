@@ -1,0 +1,211 @@
+
+from datetime import datetime, timedelta
+from typing import List, Dict
+
+import functools
+import reflex as rx
+import sqlite3
+
+import to_do.state
+
+#-------------------------------------------------------------------------------------------------
+
+"""
+Database creation
+
+"""
+
+db_conn = sqlite3.connect('to_do_db1.sqlite')
+db_cursor = db_conn.cursor()
+db_cursor.execute("""CREATE TABLE IF NOT EXISTS tasks_table (
+                id integer primary key autoincrement, 
+                task_name text,
+                start_time text,
+                end_time text)""")
+db_conn.commit()
+db_conn.close()
+
+
+#-------------------------------------------------------------------------------------------------
+
+def day_of_week_button(day_name: str):
+    """
+    Returns a button to select the particular day of the week
+
+    """
+    return rx.button(
+                day_name,
+                bg="#9cd1f3",
+                color="black",
+                width="7.5em",          
+                size="lg",
+                on_click=to_do.state.State.day_selector(day_name))
+
+#-------------------------------------------------------------------------------------------------
+         
+def task_line_item(task_line: str):
+    """
+    Displays task items from database for each day of the week
+    Also displays options for user to mark each task item as completed 
+    or to permanently delete the task items from the database
+
+    """
+    return rx.hstack(
+        # rx.text(task_line, font_size="3em"),
+        rx.checkbox(task_line,
+                    color_scheme="red",
+                    size="lg",
+                    on_change=to_do.state.State.handle_task_completion_toggle,
+            ),
+        rx.icon(tag="delete",
+                on_click=to_do.state.State.task_not_deleted_upon_request),
+        rx.modal(
+            rx.modal_overlay(
+                rx.modal_content(
+                    rx.modal_header("Delete Task"),
+                    rx.modal_body(
+                        "Are you sure you want to delete this item?"
+                    ),
+                    rx.modal_footer(
+                        rx.button("Yes", on_click=to_do.state.State.task_deleted_upon_request),
+                        rx.button("No", on_click=to_do.state.State.task_not_deleted_upon_request)))),
+            is_open=to_do.state.State.show))
+
+#-------------------------------------------------------------------------------------------------
+
+"""
+Page Layout
+
+"""
+
+def index() -> rx.Component:
+    return rx.fragment(
+
+        rx.box(
+            rx.color_mode_button(
+                rx.color_mode_icon(),
+                float="right",
+                margin_right="30px",
+                margin_top="25px"
+                ),
+
+            rx.text("light / dark mode",
+                float="right",
+                margin_right="10px",
+                margin_top="32px")),
+
+        rx.container(
+            rx.vstack(
+                rx.box(
+                    rx.popover(
+                        rx.popover_trigger
+                            (rx.image(src="/todoicon.png",
+                             padding_top="55%",
+                             width="125px",
+                             on_double_click=rx.redirect(
+                                "https://reflex.dev/docs/getting-started/introduction/",
+                                external=True))),
+                    rx.popover_content(
+                    rx.popover_header("This is my first app made with Reflex. Double click the icon to find out more")))))),
+      
+        rx.vstack(
+           
+            rx.heading("Lucy's Fancy To-Do List",
+                       margin="40px",
+                       font_family="Pixelify Sans",
+                       font_size="400%"),
+           
+            rx.divider(border_color="skyblue",
+                       width="75%",
+                       border_width="medium"),
+                       
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+
+            rx.hstack(
+            rx.input(on_change=to_do.state.State.set_new_task_name_text,
+                    placeholder="Name of Task",
+                    type_="text",
+                    border_width="medium",
+                    border_color="white",
+                    width="12em"),
+               
+            rx.input(on_change=to_do.state.State.set_new_task_start_time,
+                    placeholder="Start Time",
+                    type_="datetime-local",
+                    border_width="medium",
+                    border_color="white",
+                    width="12em"),
+
+            rx.input(on_change=to_do.state.State.set_new_task_end_time,
+                    placeholder="End Time",
+                    type_="datetime-local",
+                    border_width="medium",
+                    border_color="white",
+                    width="12em"),
+
+            rx.icon(
+                    tag="arrow_left",
+                    width="2em",
+                    color="coral"),
+
+            rx.button("Create New Task",
+                      on_click=to_do.state.State.add_task_to_db,
+                       width="12em",
+                       color="black",
+                       bg="#9cd1f3")),
+
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+           
+            rx.hstack(
+                rx.foreach(to_do.state.State.days_of_week, day_of_week_button)),
+
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+
+            rx.button("Show All Tasks",
+                      on_click=to_do.state.State.show_all_tasks,
+                       width="12em",
+                       color="black",
+                       bg="#9cd1f3",
+                       size="lg"),
+
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+
+            rx.heading(to_do.state.State.selected_day,
+                       font_family="Pixelify Sans",
+                       font_size="5em"),
+
+            rx.spacer(),
+            rx.spacer(),
+            rx.spacer(),
+            rx.vstack(
+                rx.foreach(to_do.state.State.lists_tasks, task_line_item)),
+           
+            rx.spacer(),
+            rx.spacer()),
+
+       
+            spacing="12em",
+            padding_top="2%")
+
+
+   
+app = rx.App(stylesheets=["https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&display=swap"],)
+app.add_page(index)
+app.compile()
